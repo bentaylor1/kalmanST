@@ -1,0 +1,15 @@
+Package: kalmanST
+Type: Package
+Title: Kalman Filtering for Spatiotemporal Processes
+Version: 0.1
+Date: 2016-01-04
+Author: Benjamin M. Taylor and Barry S. Rowlingson
+Maintainer: Benjamin M. Taylor <b.taylor1@lancaster.ac.uk>
+Description: Analysis of spatiotemporal data using the Kalman filter, including inference and prediction.
+License: GPL-3
+Imports: sp,
+         spatsurv,
+         RandomFields
+Suggests:
+    rgdal,
+    gpclib
