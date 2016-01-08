@@ -75,6 +75,7 @@ kffit_stationary_STGP <- function(  form,
 
     W <- matrix(0,npar,npar)
     W[1:kf_spec$Nspatial,1:kf_spec$Nspatial] <- Sigma
+    W <- (1-a^2)*W
 
     nobs <- sapply(1:tmax,function(x){sum(data[[tid]]==x)})
 
@@ -252,7 +253,7 @@ run_filter <- function(kf_spec,
 
          
         # this bit calls KF advance       
-        new <- kfadvance(obs=obs,oldmean=Xpost,oldvar=Vpost,A=A,B=B,C=C,D=D,E=E,F=F,W=W,V=V,marglik=TRUE,log=TRUE,na.rm=na.rm) 
+        new <- kfadvance_stationary_STGP(obs=obs,oldmean=Xpost,oldvar=Vpost,A=A,B=B,C=C,D=D,E=E,F=F,W=W,V=V,marglik=TRUE,log=TRUE,na.rm=na.rm) 
          
         Xpost <- new$mean 
         Vpost <- new$var 

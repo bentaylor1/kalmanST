@@ -27,6 +27,34 @@ predictPlots <- function(out,pause=TRUE,...){
 }
 
 
+##' SPlots function
+##'
+##' A function to 
+##'
+##' @param out X 
+##' @param pause X
+##' @param ... X
+##' @return ...
+##' @export
+
+SPlots <- function(out,pause=TRUE,...){
+    n <- out$Nspatial
+    T <- ncol(out$history.means)
+
+    for(i in 1:n){     
+        upp <- out$history.means[i,] + 1.96*sqrt(out$history.vars[i,])
+        low <- out$history.means[i,] - 1.96*sqrt(out$history.vars[i,])
+        plot(1:T,out$history.means[i,],xlim=c(1,T),ylim=c(min(low),max(upp)),type="l")
+        polygon(c(1:T,T:1),c(upp,rev(low)),col=rgb(0,0,1,alpha=0.2),border=NA)
+
+        if(pause){
+            cat ("Press a key to continue")
+            line <- readline()
+        }
+    }
+}
+
+
 # ## fit function
 # ##
 # ## A function to 
