@@ -1,4 +1,6 @@
-##' kfadvance function
+
+
+##' kfadvance_stationary_STGP function
 ##'
 ##' A function to 
 ##'
@@ -19,42 +21,41 @@
 ##' @return ...
 ##' @export
 
-kfadvance <- function (obs, oldmean, oldvar, A, B, C, D, E, F, W, V, marglik = FALSE,log = TRUE, na.rm = FALSE){
+kfadvance_stationary_STGP <- function (obs, oldmean, oldvar, A, B, C, D, E, F, W, V, marglik = FALSE,log = TRUE, na.rm = FALSE){
     if (na.rm) {
         if (any(is.na(obs))) {
             if (all(is.na(obs))) {
                 if (log) {
-                  return(list(mean = A %*% oldmean + B, var = A %*% 
-                    oldvar %*% t(A) + C %*% W %*% t(C), mlik = 0))
+                  return(list(mean = diag(A)*oldmean + B, var = t(t(diag(A)*oldvar)*diag(A)) + W, mlik = 0))
                 }
                 else {
-                  return(list(mean = A %*% oldmean + B, var = A %*% 
-                    oldvar %*% t(A) + C %*% W %*% t(C), mlik = 1))
+                  return(list(mean = diag(A)*oldmean + B, var = t(t(diag(A)*oldvar)*diag(A)) + W, mlik = 1))
                 }
             }
             else {
-                M <- diag(length(obs))
-                M <- M[-which(is.na(obs)), ]
-                obs <- obs[which(!is.na(obs))]
-                D <- M %*% D
-                E <- M %*% E
-                F <- M %*% F
+                #M <- diag(length(obs))
+                ind <- !is.na(obs)
+                #M <- M[-which(is.na(obs)), ]
+                obs <- obs[ind]
+                #D <- M %*% D
+                D <- D[ind,,drop=FALSE]
+                V <- diag(V[1,1],sum(ind))
             }
         }
     }
-    T <- A %*% oldmean + B
-    S <- A %*% oldvar %*% t(A) + C %*% W %*% t(C)
+    T <- diag(A)*oldmean
+    S <- t(t(diag(A)*oldvar)*diag(A)) + W
     thing1 <- D %*% S
     tD <- t(D)
-    K <- thing1 %*% tD + F %*% V %*% t(F)
-    margmean <- D %*% T + E
+    K <- thing1 %*% tD + V
+    margmean <- D %*% T
     resid <- obs - margmean
     if (marglik == TRUE) {
         if (all(dim(K) == 1)) {
             thing2 <- S %*% tD
             newmean <- T + as.numeric(1/K) * thing2 %*% resid
             newvar <- S - as.numeric(1/K) * thing2 %*% thing1
-            marginal <- dnorm(obs, as.numeric(margmean), sqrt(as.numeric(K)), 
+            marginal <- dnorm(as.numeric(obs), as.numeric(margmean), sqrt(as.numeric(K)), 
                 log = log)
         }
         else {
@@ -67,7 +68,7 @@ kfadvance <- function (obs, oldmean, oldvar, A, B, C, D, E, F, W, V, marglik = F
             thing4 <- S %*% thing3
             newmean <- T + thing4 %*% resid
             newvar <- S - thing4 %*% thing1
-            #marginal <- -(1/2)*determinant(K)$modulus + (-1/2) * t(resid) %*% Kinv %*% resid
+            #if(!isSymmetric(newvar)){browser()}
             marginal <- -(1/2)*logdetK + (-1/2) * t(resid) %*% Kinv %*% resid
             #marginal <- dmvnorm(as.vector(obs),as.vector(margmean),K,log=TRUE)
             if (!log) {
@@ -83,11 +84,7 @@ kfadvance <- function (obs, oldmean, oldvar, A, B, C, D, E, F, W, V, marglik = F
             newvar <- S - as.numeric(1/K) * thing2 %*% thing1
         }
         else {
-            #Kinv <- solve(K)
-            Kchol <- chol(K)
-            Kcholinv <- solve(Kchol)
-            #logdetK <- 2*sum(log(diag(Kchol)))
-            Kinv <- Kcholinv%*%t(Kcholinv)
+            Kinv <- solve(K)
             thing3 <- tD %*% Kinv
             thing4 <- S %*% thing3
             newmean <- T + thing4 %*% resid
@@ -96,5 +93,3 @@ kfadvance <- function (obs, oldmean, oldvar, A, B, C, D, E, F, W, V, marglik = F
         return(list(mean = newmean, var = newvar))
     }
 }
-
-

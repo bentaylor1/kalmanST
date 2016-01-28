@@ -9,6 +9,7 @@
 ##' @param tmax X
 ##' @param data X 
 ##' @param cov.model X 
+##' @param returnFunction X
 ##' @param history.means X 
 ##' @param history.vars X 
 ##' @param diagonal_only X 
@@ -18,7 +19,8 @@
 ##' @param se.fit X 
 ##' @param se.predict X 
 ##' @param noisy X 
-##' @param na.rm X 
+##' @param na.rm X
+
 ##' @return ...
 ##' @export
 
@@ -30,6 +32,7 @@ kffit_stationary_STGP <- function(  form,
                                     tmax,
                                     data,
                                     cov.model,
+                                    returnFunction=FALSE,
                                     history.means=TRUE,
                                     history.vars=TRUE,
                                     diagonal_only=TRUE,
@@ -71,11 +74,7 @@ kffit_stationary_STGP <- function(  form,
     npar <- kf_spec$Nspatial + kf_spec$Nfixed 
 
     u <- as.vector(as.matrix(dist(uqcrds)))
-    Sigma <- matrix(EvalCov(cov.model,u=u,parameters=c(sigma_S,phi_S)),kf_spec$Nspatial,kf_spec$Nspatial)
-
-    W <- matrix(0,npar,npar)
-    W[1:kf_spec$Nspatial,1:kf_spec$Nspatial] <- Sigma
-    W <- (1-a^2)*W
+    #HERE
 
     nobs <- sapply(1:tmax,function(x){sum(data[[tid]]==x)})
 
@@ -84,7 +83,7 @@ kffit_stationary_STGP <- function(  form,
     Xt <- list()
     if(Nfixed>0){
         mm <- model.frame(form,data,na.action=function(x){x}) # model frame because it deals with NA's in the way I want
-        mm <- mm[,-1] # remove outcome column
+        mm[,1] <- 1 # dummy outcome for purpose of constructing covariate matrix
         mm <- model.matrix(form,mm)
     }
 
@@ -109,17 +108,14 @@ kffit_stationary_STGP <- function(  form,
         }
     }
 
-    Amat <- diag(rep(c(a,1),c(kf_spec$Nspatial,kf_spec$Nfixed)))
     Bmat <- matrix(0,npar,1)
     Cmat <- diag(1,npar)
     Emat <- matrix(0,kf_spec$Nspatial,1)
     Fmat <- diag(1,kf_spec$Nspatial)
-    Vmat <- diag(sigma_Y^2,kf_spec$Nspatial)
 
-    kf_spec$A <- function(t){return(Amat)}
     kf_spec$B <- function(t){return(Bmat)}
     kf_spec$C <- function(t){return(Cmat)}
-    kf_spec$W <- function(t){return(W)}
+    
     if(Nfixed>0){
         kf_spec$D <- function(t){return(cbind(diag(1,kf_spec$Nspatial),Xt[[t]]))}
     }
@@ -128,21 +124,92 @@ kffit_stationary_STGP <- function(  form,
     }
     kf_spec$E <- function(t){return(Emat)}
     kf_spec$F <- function(t){return(Fmat)}
-    kf_spec$V <- function(t){return(Vmat)}
     kf_spec$Y <- function(t){return(matrix(obser[,t],kf_spec$Nspatial,1))}
 
-    out <- run_filter(kf_spec=kf_spec,
-                        optim=FALSE,        # set this to FALSE if not estimating parameters, otherwise, if parameters have already been estimated, then set to TRUE 
-                        history.means=history.means,# whether to save a matrix of filtered E(Theta_t) 
-                        history.vars=history.vars, # whether to save a list of filtered V(Theta_t) 
-                        diagonal_only=diagonal_only,
-                        prior.mean=prior.mean,    # optional prior mean. column vector.    # Normally set  
-                        prior.var=prior.var,     # optional prior mean. matrix.           # these inside the code 
-                        fit=fit,          # whether to return a matrix of fitted values 
-                        se.fit=se.fit,       # whether to return the standard error of the fitted values 
-                        se.predict=se.predict,   # whether to return the prediction standard error = se(fitted values) + observation variance V_t 
-                        noisy=noisy,         # whether to print a progress bar, useful. 
-                        na.rm=na.rm)
+    # RMidx <- rep(FALSE,ncol(obser))
+    # for(i in 1:ncol(obser)){
+    #     if(all(is.na(obser[,i]))){
+    #         RMidx[i] <- TRUE 
+    #     }
+    # }
+    # RMidx <- which(RMidx)
+
+    if(returnFunction){
+
+        fun <- function(pars){
+
+            a = exp(pars[1])/(1+exp(pars[1]))
+            sigma_S = exp(pars[2])
+            phi_S = exp(pars[3])
+            sigma_Y = exp(pars[4])
+
+            Amat <- diag(rep(c(a,1),c(kf_spec$Nspatial,kf_spec$Nfixed)))
+            Vmat <- diag(sigma_Y^2,kf_spec$Nspatial)
+            Sigma <- matrix(EvalCov(cov.model,u=u,parameters=c(sigma_S,phi_S)),kf_spec$Nspatial,kf_spec$Nspatial)
+            W <- matrix(0,npar,npar)
+            W[1:kf_spec$Nspatial,1:kf_spec$Nspatial] <- Sigma
+            W <- (1-a^2)*W
+            kf_spec$A <- function(t){return(Amat)}
+            kf_spec$V <- function(t){return(Vmat)}
+            kf_spec$W <- function(t){return(W)}
+
+            out <- run_filter(kf_spec=kf_spec,
+                                optim=TRUE,        # set this to FALSE if not estimating parameters, otherwise, if parameters have already been estimated, then set to TRUE 
+                                history.means=FALSE,# whether to save a matrix of filtered E(Theta_t) 
+                                history.vars=FALSE, # whether to save a list of filtered V(Theta_t) 
+                                diagonal_only=TRUE,
+                                prior.mean=prior.mean,    # optional prior mean. column vector.    # Normally set  
+                                prior.var=prior.var,     # optional prior mean. matrix.           # these inside the code 
+                                fit=FALSE,          # whether to return a matrix of fitted values 
+                                se.fit=FALSE,       # whether to return the standard error of the fitted values 
+                                se.predict=FALSE,   # whether to return the prediction standard error = se(fitted values) + observation variance V_t 
+                                noisy=noisy,         # whether to print a progress bar, useful. 
+                                na.rm=na.rm)
+            print(pars)
+            print(out)  
+            return(out)
+
+            # metric <- (obser-out$fit)^2/out$se.predict
+            # if(length(RMidx)>0){
+            #     metric <- metric[,-RMidx]
+            # }
+            # ans <- sum(metric)
+            # print(ans)
+            # if(is.na(ans)){
+            #     return(runif(1,1e10,1e11))
+            # }
+            # else{
+            #     return(ans)
+            # }
+        }
+        attr(fun,"inits") <- c(log(a/(1-a)),log(sigma_S),log(phi_S),log(sigma_Y))
+        return(fun)
+    }
+    else{
+        Sigma <- matrix(EvalCov(cov.model,u=u,parameters=c(sigma_S,phi_S)),kf_spec$Nspatial,kf_spec$Nspatial)
+        W <- matrix(0,npar,npar)
+        W[1:kf_spec$Nspatial,1:kf_spec$Nspatial] <- Sigma
+        W <- (1-a^2)*W
+        Amat <- diag(rep(c(a,1),c(kf_spec$Nspatial,kf_spec$Nfixed)))
+        Vmat <- diag(sigma_Y^2,kf_spec$Nspatial)
+        kf_spec$A <- function(t){return(Amat)}
+        kf_spec$V <- function(t){return(Vmat)}
+        kf_spec$W <- function(t){return(W)}
+
+        out <- run_filter(kf_spec=kf_spec,
+                            optim=FALSE,        # set this to FALSE if not estimating parameters, otherwise, if parameters have already been estimated, then set to TRUE 
+                            history.means=history.means,# whether to save a matrix of filtered E(Theta_t) 
+                            history.vars=history.vars, # whether to save a list of filtered V(Theta_t) 
+                            diagonal_only=diagonal_only,
+                            prior.mean=prior.mean,    # optional prior mean. column vector.    # Normally set  
+                            prior.var=prior.var,     # optional prior mean. matrix.           # these inside the code 
+                            fit=fit,          # whether to return a matrix of fitted values 
+                            se.fit=se.fit,       # whether to return the standard error of the fitted values 
+                            se.predict=se.predict,   # whether to return the prediction standard error = se(fitted values) + observation variance V_t 
+                            noisy=noisy,         # whether to print a progress bar, useful. 
+                            na.rm=na.rm)    
+    }
+    
 
     retlist <- list()
     retlist$Nspatial <- kf_spec$Nspatial 
@@ -238,6 +305,8 @@ run_filter <- function(kf_spec,
     } 
        
     for(t in 1:kf_spec$T){ 
+
+        #print(t)
      
         # delete or complete the following rows as necessary 
         A <- kf_spec$A(t)
@@ -254,6 +323,7 @@ run_filter <- function(kf_spec,
          
         # this bit calls KF advance       
         new <- kfadvance_stationary_STGP(obs=obs,oldmean=Xpost,oldvar=Vpost,A=A,B=B,C=C,D=D,E=E,F=F,W=W,V=V,marglik=TRUE,log=TRUE,na.rm=na.rm) 
+        #new <- kfadvance(obs=obs,oldmean=Xpost,oldvar=Vpost,A=A,B=B,C=C,D=D,E=E,F=F,W=W,V=V,marglik=TRUE,log=TRUE,na.rm=na.rm) 
          
         Xpost <- new$mean 
         Vpost <- new$var 
@@ -327,3 +397,21 @@ run_filter <- function(kf_spec,
 } 
  
 
+##' parest function
+##'
+##' A function to 
+##'
+##' @param fun X 
+##' @param ... optinal arguments to be passed to optim
+##' @return ...
+##' @export
+
+KFparest <- function(fun,...){
+    opt <- optim(attr(fun,"inits"),fun,...)
+    #opt <- optim(c(0,0,0,0),fun,...)
+    #opt <- optifix(attr(fun,"inits"),c(FALSE,FALSE,FALSE,TRUE),fun)
+    ans <- c(exp(opt$par[1])/(1+exp(opt$par[1])),exp(opt$par[2]),exp(opt$par[3]),exp(opt$par[4]))
+    names(ans) <- c("a","sigma_S","phi_S","sigma_Y")
+    attr(ans,"opt") <- opt
+    return(ans)
+}

@@ -5,9 +5,9 @@
 \title{kffit_stationary_STGP function}
 \usage{
 kffit_stationary_STGP(form, param, pid, tid, tmax, data, cov.model,
-  history.means = TRUE, history.vars = TRUE, diagonal_only = TRUE,
-  prior.mean = NULL, prior.var = NULL, fit = TRUE, se.fit = TRUE,
-  se.predict = TRUE, noisy = TRUE, na.rm = TRUE)
+  returnFunction = FALSE, history.means = TRUE, history.vars = TRUE,
+  diagonal_only = TRUE, prior.mean = NULL, prior.var = NULL, fit = TRUE,
+  se.fit = TRUE, se.predict = TRUE, noisy = TRUE, na.rm = TRUE)
 }
 \arguments{
 \item{form}{X}
@@ -23,6 +23,8 @@ kffit_stationary_STGP(form, param, pid, tid, tmax, data, cov.model,
 \item{data}{X}
 
 \item{cov.model}{X}
+
+\item{returnFunction}{X}
 
 \item{history.means}{X}
 
